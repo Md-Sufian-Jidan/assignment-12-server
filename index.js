@@ -82,15 +82,25 @@ async function run() {
             const result = await testsCollection.insertOne(testData);
             res.send(result);
         });
+
         // all tests
         app.get('/all-tests', async (req, res) => {
             const result = await testsCollection.find().toArray();
             res.send(result);
         });
 
+        // get a single data to the homepage
+        app.get('/details/:id', async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: new ObjectId(id) };
+            const result = await testsCollection.findOne(query);
+            res.send(result);
+        });
+
         // delete a single test
         app.delete('/test-delete/:id', async (req, res) => {
             const id = req.params.id;
+            console.log(id);
             const query = { _id: new Object(id) };
             const result = await testsCollection.deleteOne(query);
             res.send(result);
@@ -103,6 +113,7 @@ async function run() {
             const test = req.body;
             console.log(test);
             const query = { _id: new Object(id) };
+            console.log(query);
             const updatedDoc = {
                 $set: {
                     ...test
@@ -114,12 +125,18 @@ async function run() {
         });
 
         //get a single test
-        app.get('/single-test/:id', async(req, res) => {
+        app.get('/single-test/:id', async (req, res) => {
             const id = req.params.id;
-            const query = {_id : new ObjectId(id)};
+            const query = { _id: new ObjectId(id) };
             const result = await testsCollection.findOne(query);
             res.send(result);
-        })
+        });
+
+        // all users
+        app.get('/all-users', async (req, res) => {
+            const result = await usersCollection.find().toArray();
+            res.send(result);
+        });
 
         // Send a ping to confirm a successful connection
         // await client.db("admin").command({ ping: 1 });
