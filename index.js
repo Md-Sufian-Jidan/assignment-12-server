@@ -32,6 +32,7 @@ const client = new MongoClient(uri, {
     }
 });
 
+const testsCollection = client.db('HealthScope').collection('tests');
 const usersCollection = client.db('HealthScope').collection('users');
 
 async function run() {
@@ -57,21 +58,30 @@ async function run() {
             const result = await usersCollection.insertOne(user);
             res.send(result);
         });
-        // check a user is admin or guest
-        app.get('/users/admin/:email', verifyToken, async (req, res) => {
+        // check a user is admin or guest verifyToken,
+        app.get('/users/admin/:email', async (req, res) => {
             const email = req.params.email;
 
             // if (email !== req.decoded.email) {
             //   return res.status(403).send({ message: 'forbidden access' })
             // }
             const query = { email: email };
-            const user = await userCollection.findOne(query);
+            const user = await usersCollection.findOne(query);
             let admin = false;
             if (user) {
                 admin = user?.role === 'admin';
             }
             res.send({ admin });
-        })
+        });
+
+        // adding a test 
+        app.post('/add-test', async (req, res) => {
+            const test = req.body;
+            const date = new Date();
+            const testData = { ...test, date };
+            const result = await testsCollection.insertOne(testData);
+            res.send(result);
+        });
 
         // Send a ping to confirm a successful connection
         // await client.db("admin").command({ ping: 1 });
