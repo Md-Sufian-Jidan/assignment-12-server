@@ -3,7 +3,7 @@ const app = express();
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const port = process.env.PORT || 9000;
 
 const options = {
@@ -82,6 +82,44 @@ async function run() {
             const result = await testsCollection.insertOne(testData);
             res.send(result);
         });
+        // all tests
+        app.get('/all-tests', async (req, res) => {
+            const result = await testsCollection.find().toArray();
+            res.send(result);
+        });
+
+        // delete a single test
+        app.delete('/test-delete/:id', async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: new Object(id) };
+            const result = await testsCollection.deleteOne(query);
+            res.send(result);
+        });
+
+        // Update a single test
+        app.put('/test-update/:id', async (req, res) => {
+            const id = req.params.id;
+            console.log(id);
+            const test = req.body;
+            console.log(test);
+            const query = { _id: new Object(id) };
+            const updatedDoc = {
+                $set: {
+                    ...test
+                },
+            };
+            const options = { upsert: true };
+            const result = await testsCollection.updateOne(query, updatedDoc, options);
+            res.send(result);
+        });
+
+        //get a single test
+        app.get('/single-test/:id', async(req, res) => {
+            const id = req.params.id;
+            const query = {_id : new ObjectId(id)};
+            const result = await testsCollection.findOne(query);
+            res.send(result);
+        })
 
         // Send a ping to confirm a successful connection
         // await client.db("admin").command({ ping: 1 });
