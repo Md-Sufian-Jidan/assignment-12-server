@@ -19,6 +19,24 @@ const options = {
 //middlewares
 app.use(cors(options));
 app.use(express.json());
+
+// middlewares 
+const verifyToken = (req, res, next) => {
+    // console.log('inside verify token', req.headers.authorization);
+    if (!req.headers.authorization) {
+        return res.status(401).send({ message: 'unauthorized access' });
+    }
+    const token = req.headers.authorization.split(' ')[1];
+    console.log(token);
+    jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+        if (err) {
+            return res.status(401).send({ message: 'unauthorized access' })
+        }
+        req.decoded = decoded;
+        next();
+    });
+};
+
 //-------------------
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.qvjjrvn.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
@@ -34,16 +52,28 @@ const client = new MongoClient(uri, {
 
 const testsCollection = client.db('HealthScope').collection('tests');
 const usersCollection = client.db('HealthScope').collection('users');
+const bannersCollection = client.db('HealthScope').collection('banners');
 
 async function run() {
     try {
         // Connect the client to the server	(optional starting in v4.7)
         await client.connect();
+        // use verify admin after  
+        // const verifyAdmin = async (req, res, next) => {
+        //     const email = req.decoded.email;
+        //     const query = { email: email };
+        //     const user = await usersCollection.findOne(query);
+        //     const isAdmin = user?.role === 'admin';
+        //     if (!isAdmin) {
+        //         return res.status(403).send({ message: 'forbidden access' });
+        //     }
+        //     next();
+        // }
 
         // jwt related api
         app.post('/jwt', async (req, res) => {
             const user = req.body;
-            const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' });
+            const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '7d' });
             res.send({ token });
         });
 
@@ -58,12 +88,11 @@ async function run() {
             const result = await usersCollection.insertOne(user);
             res.send(result);
         });
-        // check a user is admin or guest verifyToken,
+        // check a user is admin or guest  ,
         app.get('/users/admin/:email', async (req, res) => {
             const email = req.params.email;
-
             // if (email !== req.decoded.email) {
-            //   return res.status(403).send({ message: 'forbidden access' })
+            //     return res.status(403).send({ message: 'forbidden access' })
             // }
             const query = { email: email };
             const user = await usersCollection.findOne(query);
@@ -74,7 +103,7 @@ async function run() {
             res.send({ admin });
         });
 
-        // adding a test 
+        // adding a test verifyAdmin,
         app.post('/add-test', async (req, res) => {
             const test = req.body;
             const date = new Date();
@@ -85,6 +114,12 @@ async function run() {
 
         // all tests
         app.get('/all-tests', async (req, res) => {
+            // const search = req.query.search || "";
+            // let query = {
+            //     productName: {
+            //         $regex: search, $options: 'i'
+            //     }
+            // }
             const result = await testsCollection.find().toArray();
             res.send(result);
         });
@@ -97,16 +132,16 @@ async function run() {
             res.send(result);
         });
 
-        // delete a single test
+        // delete a single test  verifyAdmin,
         app.delete('/test-delete/:id', async (req, res) => {
             const id = req.params.id;
-            console.log('deleted count',id);
+            console.log('deleted count', id);
             const query = { _id: new ObjectId(id) };
             const result = await testsCollection.deleteOne(query);
             res.send(result);
         });
 
-        // Update a single test
+        // Update a single test verifyAdmin, 
         app.put('/test-update/:id', async (req, res) => {
             const id = req.params.id;
             console.log(id);
@@ -132,17 +167,43 @@ async function run() {
             res.send(result);
         });
 
-        // all users
+        // all users verifyAdmin, 
         app.get('/all-users', async (req, res) => {
             const result = await usersCollection.find().toArray();
             res.send(result);
         });
 
-         // delete a user
+        // delete a user verifyAdmin,
         app.delete('/user-delete/:id', async (req, res) => {
             const id = req.params.id;
             const query = { _id: new ObjectId(id) };
             const result = await usersCollection.deleteOne(query);
+            res.send(result);
+        });
+
+        //  get a user info by email from db verifyAdmin,
+        app.get('/role/:email', async (req, res) => {
+            const email = req.params.email;
+            const result = await usersCollection.findOne({ email });
+            res.send(result);
+        });
+
+        // add a banner  verifyAdmin,
+        app.post('/add-banner', async (req, res) => {
+            // /:email
+            // const email = req.params.email;gi
+            // let query = {};
+            // if (email) {
+            //     const query = { email: email };
+            // }
+            const banner = req.body;
+            const result = await bannersCollection.insertOne(banner);
+            res.send(result);
+        });
+
+        // all banners
+        app.get('/all-banner', verifyAdmin, async (req, res) => {
+            const result = await bannersCollection.find().toArray();
             res.send(result);
         });
 
