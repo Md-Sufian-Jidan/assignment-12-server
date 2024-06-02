@@ -1,9 +1,10 @@
 const express = require('express');
 const app = express();
 const cors = require('cors');
-const jwt = require('jsonwebtoken');
-require('dotenv').config();
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
+require('dotenv').config();
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const jwt = require('jsonwebtoken');
 const port = process.env.PORT || 9000;
 
 const options = {
@@ -53,6 +54,7 @@ const client = new MongoClient(uri, {
 const testsCollection = client.db('HealthScope').collection('tests');
 const usersCollection = client.db('HealthScope').collection('users');
 const bannersCollection = client.db('HealthScope').collection('banners');
+const bookingsCollection = client.db('HealthScope').collection('bookings');
 
 async function run() {
     try {
@@ -202,10 +204,73 @@ async function run() {
         });
 
         // all banners
-        app.get('/all-banner', verifyAdmin, async (req, res) => {
+        app.get('/all-banner', async (req, res) => {
             const result = await bannersCollection.find().toArray();
             res.send(result);
         });
+
+        // set a banner to the home page
+        app.patch('/update/banner/:id', async (req, res) => {
+            const filter = { isActive: true };
+            const updateIsActive = {
+                $set: {
+                    isActive: false,
+                },
+            };
+            const actives = await bannersCollection.updateMany(filter, updateIsActive);
+            // update a isActive to true
+            const id = req.params.id;
+            const query = { _id: new ObjectId(id) };
+            const updatedDoc = {
+                $set: {
+                    isActive: true
+                },
+            };
+            const update = await bannersCollection.updateOne(query, updatedDoc);
+            res.send(update);
+        });
+
+        // create stripe api
+        app.post('/create-payment-intent', verifyToken, async (req, res) => {
+            const price = req.body.price;
+            const priceInCent = parseFloat(price * 100);
+
+            // generate client secret 
+            // send client secret as response
+            if (!price || priceInCent < 1) return;
+
+            const { client_secret } = await stripe.paymentIntents.create({
+                amount: priceInCent,
+                currency: 'usd',
+                automatic_payment_methods: {
+                    enabled: true
+                },
+            });
+            // send the client secret in the client side
+            res.send({ client_secret: client_secret });
+        });
+
+        // Save a booking data in db
+        app.post('/booking', async (req, res) => {
+            const bookingData = req.body;
+            const result = await bookingsCollection.insertOne(bookingData);
+            res.send(result); 
+        });
+
+        // update a book status
+        app.patch('/book/slot/:id', verifyToken, async (req, res) => {
+            const id = req.params.id;
+            // const status = req.body.status;
+            const query = { _id: new ObjectId(id) };
+            // const updateDoc = {
+            //     $set: {
+            //         booked: status
+            //     },
+            // };
+            const updateRoom = await testsCollection.updateOne(query, { $inc: { slot: -1 } });
+            res.send(updateRoom);
+        });
+
 
         // Send a ping to confirm a successful connection
         // await client.db("admin").command({ ping: 1 });
