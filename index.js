@@ -100,8 +100,8 @@ async function run() {
         // delete a single test
         app.delete('/test-delete/:id', async (req, res) => {
             const id = req.params.id;
-            console.log(id);
-            const query = { _id: new Object(id) };
+            console.log('deleted count',id);
+            const query = { _id: new ObjectId(id) };
             const result = await testsCollection.deleteOne(query);
             res.send(result);
         });
@@ -112,7 +112,7 @@ async function run() {
             console.log(id);
             const test = req.body;
             console.log(test);
-            const query = { _id: new Object(id) };
+            const query = { _id: new ObjectId(id) };
             console.log(query);
             const updatedDoc = {
                 $set: {
@@ -135,6 +135,14 @@ async function run() {
         // all users
         app.get('/all-users', async (req, res) => {
             const result = await usersCollection.find().toArray();
+            res.send(result);
+        });
+
+         // delete a user
+        app.delete('/user-delete/:id', async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: new ObjectId(id) };
+            const result = await usersCollection.deleteOne(query);
             res.send(result);
         });
 
