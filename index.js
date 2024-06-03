@@ -289,6 +289,20 @@ async function run() {
             res.send(result);
         });
 
+        // make a user to a admin
+        app.patch('/user/role/:id', async (req, res) => {
+            const id = req.params.id;gi
+            const status = req.body;
+            const query = { _id: new ObjectId(id) };
+            const updatedDoc = {
+                $set: {
+                    status: status
+                }
+            }
+            const result = await usersCollection.updateOne(query, updatedDoc);
+            res.send(result);
+        });
+
         // Send a ping to confirm a successful connection
         // await client.db("admin").command({ ping: 1 });
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
