@@ -55,6 +55,7 @@ const testsCollection = client.db('HealthScope').collection('tests');
 const usersCollection = client.db('HealthScope').collection('users');
 const bannersCollection = client.db('HealthScope').collection('banners');
 const bookingsCollection = client.db('HealthScope').collection('bookings');
+const recommendationsCollection = client.db('HealthScope').collection('recommendations');
 
 async function run() {
     try {
@@ -116,15 +117,17 @@ async function run() {
 
         // all tests
         app.get('/all-tests', async (req, res) => {
-            // const search = req.query.search || "";
-            // let query = {};
-            // if (query) {
-            //     query = {
-            //         date: {
-            //             $regex: search, $options: 'i'
-            //         }
-            //     }
-            // }
+            const search = req.query.search || "";
+            console.log(search);
+            let query = {};
+            if (query) {
+                query = {
+                    date: {
+                        $regex: search, $options: 'i'
+                    }
+                }
+            }
+            console.log(query);
             const result = await testsCollection.find().toArray();
             res.send(result);
         });
@@ -176,6 +179,21 @@ async function run() {
         app.get('/all-users', async (req, res) => {
             const result = await usersCollection.find().toArray();
             res.send(result);
+        });
+        // TODO: is work is not finish
+        // download a single user data 
+        app.post('/user/download', async (req, res) => {
+            const user = req.body;
+            console.log(user);
+            // get a single user
+            const id = req.body._id;
+            const query = { _id: new ObjectId(id) };
+            const singleUser = await usersCollection.findOne(query);
+            // get the users bookings
+            const email = req.body.email;
+            const filter = { 'guest.email': email };
+            const userBookings = await bookingsCollection.find(filter).toArray();
+            res.send({ singleUser, userBookings });
         });
 
         // delete a user verifyAdmin,
@@ -291,18 +309,34 @@ async function run() {
 
         // make a user to a admin
         app.patch('/user/role/:id', async (req, res) => {
-            const id = req.params.id;gi
-            const status = req.body;
+            const id = req.params.id;
+            const role = req.body;
+            console.log(role);
             const query = { _id: new ObjectId(id) };
             const updatedDoc = {
-                $set: {
-                    status: status
-                }
-            }
+                $set: role
+            };
             const result = await usersCollection.updateOne(query, updatedDoc);
             res.send(result);
         });
 
+        // change a user status
+        app.patch('/user/status/:id', async (req, res) => {
+            const id = req.params.id;
+            const status = req.body;
+            const query = { _id: new ObjectId(id) };
+            const updatedDoc = {
+                $set: status
+            };
+            const result = await usersCollection.updateOne(query, updatedDoc);
+            res.send(result);
+        });
+
+        // get all the recommendations
+        app.get('/recommendations', async (req, res) => {
+            const result = await recommendationsCollection.find().toArray();
+            res.send(result);
+        });
         // Send a ping to confirm a successful connection
         // await client.db("admin").command({ ping: 1 });
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
@@ -319,4 +353,4 @@ app.get('/', (req, res) => {
 
 app.listen(port, () => {
     console.log('server is running', port);
-})
+});
