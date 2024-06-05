@@ -5,6 +5,7 @@ const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 require('dotenv').config();
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const jwt = require('jsonwebtoken');
+const nodemailer = require("nodemailer");
 const port = process.env.PORT || 9000;
 
 const options = {
@@ -20,6 +21,45 @@ const options = {
 //middlewares
 app.use(cors(options));
 app.use(express.json());
+
+// set email function
+const sendEmail = async (emailAddress, emailMessage) => {
+    const transporter = nodemailer.createTransport({
+        service: "gmail",
+        host: "smtp.gmail.email",
+        port: 587,
+        secure: false, // Use `true` for port 465, `false` for all other ports
+        auth: {
+            user: process.env.NODE_MAILER_EMAIL,
+            pass: process.env.NODE_MAILER_PASS,
+        },
+    });
+
+    // verify connection configuration
+    transporter.verify(function (error, success) {
+        if (error) {
+            console.log(error);
+        } else {
+            console.log("Server is ready to take our messages");
+        }
+    });
+    const mailBody = {
+        from: `Health Scope 👩‍⚕️" <${process.env.NODE_MAILER_EMAIL}>`, // sender address
+        to: emailAddress, // list of receivers
+        subject: emailMessage.subject, // Subject line
+        // text: "Hello world?", // plain text body
+        html: emailMessage.message, // html body
+    };
+    const info = await transporter.sendMail(mailBody, (error, info) => {
+        if (error) {
+            console.log(error);
+        } else {
+            console.log('Email sent', info.response);
+        }
+    });
+
+    // console.log("Message sent: %s", info?.messageId);
+}
 
 // middlewares 
 const verifyToken = (req, res, next) => {
@@ -184,7 +224,7 @@ async function run() {
         // download a single user data 
         app.post('/user/download', async (req, res) => {
             const user = req.body;
-            console.log(user);
+            // console.log(user);
             // get a single user
             const id = req.body._id;
             const query = { _id: new ObjectId(id) };
@@ -279,6 +319,44 @@ async function run() {
             const query = { _id: new ObjectId(id) };
             const update = testsCollection.updateOne(query, { $inc: { mostBooked: 1 } })
             const result = await bookingsCollection.insertOne(bookingData);
+            // sending a email to the guest
+            sendEmail(bookingData?.guest?.email, {
+                subject: "Your Test Booking Confirmation with Health Scope",
+                message: `Dear ${bookingData?.guest?.name},
+
+                Thank you for booking your diagnostic test with Health Scope. We are pleased to confirm your appointment and look forward to assisting you with your health needs.
+                
+                If you have any questions or need further assistance, please feel free to contact us.
+                
+                Best regards,
+                The Health Scope Team
+                
+                © 2024-2025 Health Scope. All rights reserved.`
+            });
+            // sending a email to the guest
+            sendEmail(bookingData?.host?.email, {
+                subject: "Your Test Booking Confirmation with Health Scope",
+                message: `Dear ${bookingData?.host?.name},
+                Dear ${bookingData?.host?.name},
+
+                This is to inform you that a new test booking has been made on [Your Website Name].
+                
+                Details:
+                
+                User Name: ${bookingData?.guest?.name}
+                Test Name: ${bookingData?.name}
+                Booking Date: ${bookingData?.date}
+                Test Date: From ${bookingData?.from} to ${bookingData?.to}
+                User Contact: ${bookingData?.guest?.email}
+                Please ensure that all necessary preparations are made for the upcoming test.
+                
+                Thank you for your attention to this matter.
+                
+                Best regards,
+                The Health Scope System
+                
+                © 2024-2025 Health Scope. All rights reserved.`
+            });
             res.send(result);
         });
 
