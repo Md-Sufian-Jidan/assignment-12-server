@@ -117,7 +117,7 @@ async function run() {
 
         // all tests
         app.get('/all-tests', async (req, res) => {
-            const search = req.query.search || "";
+            const search = req.query.search;
             console.log(search);
             let query = {};
             if (query) {
@@ -193,7 +193,7 @@ async function run() {
             const email = req.body.email;
             const filter = { 'guest.email': email };
             const userBookings = await bookingsCollection.find(filter).toArray();
-            res.send({ singleUser, userBookings });
+            res.send({ singleUser, userBookings, });
         });
 
         // delete a user verifyAdmin,
@@ -207,7 +207,7 @@ async function run() {
         //  get a user info by email from db verifyAdmin,
         app.get('/role/:email', async (req, res) => {
             const email = req.params.email;
-            const query = { email }
+            const query = { email: email }
             const result = await usersCollection.findOne(query);
             res.send(result);
         });
@@ -275,6 +275,9 @@ async function run() {
         // Save a booking data in db
         app.post('/booking', async (req, res) => {
             const bookingData = req.body;
+            const id = bookingData.BookId;
+            const query = { _id: new ObjectId(id) };
+            const update = testsCollection.updateOne(query, { $inc: { mostBooked: 1 } })
             const result = await bookingsCollection.insertOne(bookingData);
             res.send(result);
         });
@@ -282,13 +285,7 @@ async function run() {
         // update a book status
         app.patch('/book/slot/:id', verifyToken, async (req, res) => {
             const id = req.params.id;
-            // const status = req.body.status;
             const query = { _id: new ObjectId(id) };
-            // const updateDoc = {
-            //     $set: {
-            //         booked: status
-            //     },
-            // };
             const updateRoom = await testsCollection.updateOne(query, { $inc: { slot: -1 } });
             res.send(updateRoom);
         });
@@ -337,6 +334,30 @@ async function run() {
             const result = await recommendationsCollection.find().toArray();
             res.send(result);
         });
+
+        // delete a appointment
+        app.delete('/delete/appointment/:id', async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: new ObjectId(id) };
+            const result = await bookingsCollection.deleteOne(query);
+            res.send(result);
+        });
+
+        app.get('/admin-statistic', async (req, res) => {
+            const totalUsers = await usersCollection.estimatedDocumentCount();
+            const bookingDetails = await bookingsCollection.estimatedDocumentCount();
+            const mostlyBooked = await testsCollection.find({}, {
+                projection: {
+                    mostBooked: 1,
+                    price: 1,
+                    testCategory: 1,
+                }
+            }
+            ).toArray();
+            const totalSales = mostlyBooked.reduce((acc, item) => (acc + item.price), 0);
+
+            res.send({ totalUsers, bookingDetails, totalSales, mostlyBooked });
+        })
         // Send a ping to confirm a successful connection
         // await client.db("admin").command({ ping: 1 });
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
