@@ -360,7 +360,7 @@ async function run() {
             res.send(result);
         });
 
-        // update a book status
+        // update a book slot
         app.patch('/book/slot/:id', verifyToken, async (req, res) => {
             const id = req.params.id;
             const query = { _id: new ObjectId(id) };
@@ -404,6 +404,26 @@ async function run() {
                 $set: status
             };
             const result = await usersCollection.updateOne(query, updatedDoc);
+            res.send(result);
+        });
+
+        // update report status
+        app.patch('/reservation-status/:id', async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: new ObjectId(id) };
+            const updatedDoc = {
+                $set: {
+                    status: 'deliver'
+                }
+            }
+            const result = await bookingsCollection.updateOne(query, updatedDoc);
+            res.send(result);
+        });
+        // delete a reservation report 
+        app.delete('/reservation-delete/:id', async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: new ObjectId(id) };
+            const result = await bookingsCollection.deleteOne(query);
             res.send(result);
         });
 
