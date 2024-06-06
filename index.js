@@ -102,16 +102,17 @@ async function run() {
         // Connect the client to the server	(optional starting in v4.7)
         await client.connect();
         // use verify admin after  
-        // const verifyAdmin = async (req, res, next) => {
-        //     const email = req.decoded.email;
-        //     const query = { email: email };
-        //     const user = await usersCollection.findOne(query);
-        //     const isAdmin = user?.role === 'admin';
-        //     if (!isAdmin) {
-        //         return res.status(403).send({ message: 'forbidden access' });
-        //     }
-        //     next();
-        // }
+        const verifyAdmin = async (req, res, next) => {
+            const email = req.decoded.email;
+            const query = { email: email };
+            const user = await usersCollection.findOne(query);
+            console.log(user);
+            const isAdmin = user?.role === 'admin';
+            if (!isAdmin) {
+                return res.status(403).send({ message: 'forbidden access' });
+            }
+            next();
+        }
 
         // jwt related api
         app.post('/jwt', async (req, res) => {
@@ -132,11 +133,11 @@ async function run() {
             res.send(result);
         });
         // check a user is admin or guest  ,
-        app.get('/users/admin/:email', async (req, res) => {
+        app.get('/users/admin/:email', verifyToken, async (req, res) => {
             const email = req.params.email;
-            // if (email !== req.decoded.email) {
-            //     return res.status(403).send({ message: 'forbidden access' })
-            // }
+            if (email !== req.decoded.email) {
+                return res.status(403).send({ message: 'forbidden access' })
+            }
             const query = { email: email };
             const user = await usersCollection.findOne(query);
             let admin = false;
@@ -147,7 +148,7 @@ async function run() {
         });
 
         // adding a test verifyAdmin,
-        app.post('/add-test', async (req, res) => {
+        app.post('/add-test', verifyToken, verifyAdmin, async (req, res) => {
             const test = req.body;
             const date = new Date();
             const testData = { ...test, date };
@@ -156,24 +157,29 @@ async function run() {
         });
 
         // all tests
-        app.get('/all-tests', async (req, res) => {
-            const search = req.query.search;
-            console.log(search);
-            let query = {};
-            if (query) {
-                query = {
-                    date: {
-                        $regex: search, $options: 'i'
-                    }
-                }
-            }
-            console.log(query);
+        app.get('/all-tests', verifyToken, verifyAdmin, async (req, res) => {
+            // const search = req.query.search || '';
+            // console.log(search);
+            // const dateSearch = search
+            // console.log(dateSearch);
+            // let query = {};
+            // if (query) {
+            //     query = {
+            //         createdAt: {
+            //             from: {
+            //                 $gt: dateSearch
+            //             }
+            //         }
+            //     }
+            // }
+            // console.log(query);
             const result = await testsCollection.find().toArray();
             res.send(result);
+
         });
 
         // get a single data to the homepage
-        app.get('/details/:id', async (req, res) => {
+        app.get('/details/:id', verifyToken, async (req, res) => {
             const id = req.params.id;
             const query = { _id: new ObjectId(id) };
             const result = await testsCollection.findOne(query);
@@ -181,7 +187,7 @@ async function run() {
         });
 
         // delete a single test  verifyAdmin,
-        app.delete('/test-delete/:id', async (req, res) => {
+        app.delete('/test-delete/:id', verifyToken, verifyAdmin, async (req, res) => {
             const id = req.params.id;
             console.log('deleted count', id);
             const query = { _id: new ObjectId(id) };
@@ -190,7 +196,7 @@ async function run() {
         });
 
         // Update a single test verifyAdmin, 
-        app.put('/test-update/:id', async (req, res) => {
+        app.put('/test-update/:id', verifyToken, verifyAdmin, async (req, res) => {
             const id = req.params.id;
             console.log(id);
             const test = req.body;
@@ -208,7 +214,7 @@ async function run() {
         });
 
         //get a single test
-        app.get('/single-test/:id', async (req, res) => {
+        app.get('/single-test/:id', verifyToken, async (req, res) => {
             const id = req.params.id;
             const query = { _id: new ObjectId(id) };
             const result = await testsCollection.findOne(query);
@@ -216,28 +222,36 @@ async function run() {
         });
 
         // all users verifyAdmin, 
-        app.get('/all-users', async (req, res) => {
+        app.get('/all-users', verifyToken, verifyAdmin, async (req, res) => {
             const result = await usersCollection.find().toArray();
             res.send(result);
         });
-        // TODO: is work is not finish
         // download a single user data 
-        app.post('/user/download', async (req, res) => {
+        app.post('/user/download', verifyToken, verifyAdmin, async (req, res) => {
             const user = req.body;
             // console.log(user);
             // get a single user
-            const id = req.body._id;
+            const id = user._id;
             const query = { _id: new ObjectId(id) };
             const singleUser = await usersCollection.findOne(query);
             // get the users bookings
-            const email = req.body.email;
+            const email = user.email;
             const filter = { 'guest.email': email };
             const userBookings = await bookingsCollection.find(filter).toArray();
             res.send({ singleUser, userBookings, });
         });
+        // user test report download
+        app.post('/user-test-report', verifyToken, async (req, res) => {
+            const user = req.body;
+            const email = user?.guest?.email;
+            const query = { email: email };
+            const singleUser = await usersCollection.findOne(query);
+            const userBookings = await bookingsCollection.find({ 'guest.email': email }).toArray();
+            res.send({ singleUser, userBookings });
+        });
 
         // delete a user verifyAdmin,
-        app.delete('/user-delete/:id', async (req, res) => {
+        app.delete('/user-delete/:id', verifyToken, verifyAdmin, async (req, res) => {
             const id = req.params.id;
             const query = { _id: new ObjectId(id) };
             const result = await usersCollection.deleteOne(query);
@@ -245,7 +259,7 @@ async function run() {
         });
 
         //  get a user info by email from db verifyAdmin,
-        app.get('/role/:email', async (req, res) => {
+        app.get('/role/:email', verifyToken, async (req, res) => {
             const email = req.params.email;
             const query = { email: email }
             const result = await usersCollection.findOne(query);
@@ -253,7 +267,7 @@ async function run() {
         });
 
         // add a banner  verifyAdmin,
-        app.post('/add-banner', async (req, res) => {
+        app.post('/add-banner', verifyToken, verifyAdmin, async (req, res) => {
             // /:email
             // const email = req.params.email;gi
             // let query = {};
@@ -266,13 +280,13 @@ async function run() {
         });
 
         // all banners
-        app.get('/all-banner', async (req, res) => {
+        app.get('/all-banner', verifyToken, verifyAdmin, async (req, res) => {
             const result = await bannersCollection.find().toArray();
             res.send(result);
         });
 
         // set a banner to the home page
-        app.patch('/update/banner/:id', async (req, res) => {
+        app.patch('/update/banner/:id', verifyToken, verifyAdmin, async (req, res) => {
             const filter = { isActive: true };
             const updateIsActive = {
                 $set: {
@@ -313,7 +327,7 @@ async function run() {
         });
 
         // Save a booking data in db
-        app.post('/booking', async (req, res) => {
+        app.post('/booking', verifyToken, async (req, res) => {
             const bookingData = req.body;
             const id = bookingData.BookId;
             const query = { _id: new ObjectId(id) };
@@ -369,13 +383,13 @@ async function run() {
         });
 
         // get all the booked test
-        app.get('/booked/test', async (req, res) => {
+        app.get('/booked/test', verifyToken, async (req, res) => {
             const result = await bookingsCollection.find().toArray();
             res.send(result);
         });
 
         //get all the appointments of a user
-        app.get('/appointments/:email', async (req, res) => {
+        app.get('/appointments/:email', verifyToken, async (req, res) => {
             const email = req.params.email;
             const query = { 'guest.email': email };
             const result = await bookingsCollection.find(query).toArray();
@@ -383,7 +397,7 @@ async function run() {
         });
 
         // make a user to a admin
-        app.patch('/user/role/:id', async (req, res) => {
+        app.patch('/user/role/:id', verifyToken, verifyAdmin, async (req, res) => {
             const id = req.params.id;
             const role = req.body;
             console.log(role);
@@ -396,7 +410,7 @@ async function run() {
         });
 
         // change a user status
-        app.patch('/user/status/:id', async (req, res) => {
+        app.patch('/user/status/:id', verifyToken, verifyAdmin, async (req, res) => {
             const id = req.params.id;
             const status = req.body;
             const query = { _id: new ObjectId(id) };
@@ -408,7 +422,7 @@ async function run() {
         });
 
         // update report status
-        app.patch('/reservation-status/:id', async (req, res) => {
+        app.patch('/reservation-status/:id', verifyToken, verifyAdmin, async (req, res) => {
             const id = req.params.id;
             const query = { _id: new ObjectId(id) };
             const updatedDoc = {
@@ -420,7 +434,7 @@ async function run() {
             res.send(result);
         });
         // delete a reservation report 
-        app.delete('/reservation-delete/:id', async (req, res) => {
+        app.delete('/reservation-delete/:id', verifyToken, verifyAdmin, async (req, res) => {
             const id = req.params.id;
             const query = { _id: new ObjectId(id) };
             const result = await bookingsCollection.deleteOne(query);
@@ -434,28 +448,101 @@ async function run() {
         });
 
         // delete a appointment
-        app.delete('/delete/appointment/:id', async (req, res) => {
+        app.delete('/delete/appointment/:id', verifyToken, async (req, res) => {
             const id = req.params.id;
             const query = { _id: new ObjectId(id) };
             const result = await bookingsCollection.deleteOne(query);
             res.send(result);
         });
 
-        app.get('/admin-statistic', async (req, res) => {
+        // my test result
+        app.get('/my-test-result/:email', verifyToken, async (req, res) => {
+            const email = req.params.email;
+            const query = { 'guest.email': email };
+            const result = await bookingsCollection.find(query).toArray();
+            res.send(result)
+        });
+        // admin stat
+        app.get('/admin-statistic', verifyToken, verifyAdmin, async (req, res) => {
             const totalUsers = await usersCollection.estimatedDocumentCount();
             const bookingDetails = await bookingsCollection.estimatedDocumentCount();
+            const data = await bookingsCollection.find().toArray();
+            const status = data?.map(sta => sta?.status);
+            const pending = [];
+            for (i = 0; i <= status?.length; i++) {
+                if (status[i] === 'pending') {
+                    // console.log(i);
+                    pending.push(status[i]);
+                }
+            };
+            const deliver = [];
+            for (i = 0; i <= status?.length; i++) {
+                if (status[i] === 'deliver') {
+                    // console.log(i);
+                    deliver.push(status[i]);
+                }
+            };
+            const totalPending = pending?.length
+            const totalDeliver = deliver?.length;
+            const pieData = [
+                { name: 'pending', value: totalPending },
+                { name: 'deliver', value: totalDeliver },
+            ];
+
             const mostlyBooked = await testsCollection.find({}, {
                 projection: {
                     mostBooked: 1,
                     price: 1,
                     testCategory: 1,
-                }
-            }
+                },
+            },
             ).toArray();
             const totalSales = mostlyBooked.reduce((acc, item) => (acc + item.price), 0);
 
-            res.send({ totalUsers, bookingDetails, totalSales, mostlyBooked });
+            res.send({ totalUsers, bookingDetails, totalSales, mostlyBooked, pieData, totalPending, totalDeliver });
         })
+        app.get('/guest-stat/:email', verifyToken, async (req, res) => {
+            const email = req.params.email;
+            const query = { 'guest.email': email };
+            const userBookings = await bookingsCollection.find(query).toArray();
+            const totalSales = userBookings.reduce((acc, item) => (acc + item.price), 0);
+            const totalBookings = userBookings?.length;
+            const singleUser = await usersCollection.findOne({ email: email });
+            //bar data
+            const mostlyBooked = await bookingsCollection.find({ 'guest.email': email }, {
+                projection: {
+                    price: 1,
+                    testCategory: 1,
+                    status: 1
+                },
+            },
+            ).toArray();
+            // pie chart data
+            const status = mostlyBooked?.map(sta => sta?.status);
+            const pending = [];
+            for (i = 0; i <= status?.length; i++) {
+                if (status[i] === 'pending') {
+                    // console.log(i);
+                    pending.push(status[i]);
+                }
+            };
+            const deliver = [];
+            for (i = 0; i <= status?.length; i++) {
+                if (status[i] === 'deliver') {
+                    // console.log(i);
+                    deliver.push(status[i]);
+                }
+            };
+            const totalPending = pending?.length
+            const totalDeliver = deliver?.length;
+            const pieData = [
+                { name: 'pending', value: totalPending },
+                { name: 'deliver', value: totalDeliver },
+            ];
+
+
+            res.send({ totalSales, userBookings, totalBookings, singleUser, mostlyBooked, pieData });
+        });
         // Send a ping to confirm a successful connection
         // await client.db("admin").command({ ping: 1 });
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
